@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Onewheel Tuner (ST-Link)</title>
+<style>
+  :root{--bg:#0e1116;--panel:#171c24;--panel2:#1f2732;--line:#2b3542;--txt:#e6edf3;
+        --mut:#8b98a8;--accent:#39d3ff;--ok:#3ddc84;--warn:#ffb020;--bad:#ff5470;--tilt:#c77dff;}
+  *{box-sizing:border-box}
+  body{margin:0;font:14px/1.4 system-ui,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--txt)}
+  header{display:flex;align-items:center;gap:14px;padding:12px 20px;background:var(--panel);border-bottom:1px solid var(--line)}
+  header h1{font-size:16px;margin:0;font-weight:600}
+  header .sp{flex:1}
+  .pill{font-size:12px;color:var(--mut)}
+  button{font:inherit;color:var(--txt);background:var(--panel2);border:1px solid var(--line);padding:8px 14px;border-radius:8px;cursor:pointer}
+  button:hover{border-color:var(--accent)}
+  button.kill{background:var(--bad);color:#3a0010;border-color:var(--bad);font-weight:700}
+  button.on{background:var(--ok);color:#04220f;border-color:var(--ok);font-weight:600}
+  .wrap{display:grid;grid-template-columns:340px 1fr;gap:16px;padding:16px;max-width:1150px;margin:0 auto}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px}
+  .card h2{font-size:12px;text-transform:uppercase;letter-spacing:.8px;color:var(--mut);margin:0 0 12px}
+  .telem{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .stat{background:var(--panel2);border-radius:8px;padding:10px 12px}
+  .stat .k{color:var(--mut);font-size:11px;text-transform:uppercase}
+  .stat .v{font-size:22px;font-weight:600;font-variant-numeric:tabular-nums}
+  .badge{display:inline-block;padding:6px 14px;border-radius:20px;font-weight:700;font-size:14px;background:#333}
+  .row{margin:0 0 14px}
+  .row label{display:flex;justify-content:space-between;font-size:12px;color:var(--mut);margin-bottom:4px}
+  .row label b{color:var(--txt);font-variant-numeric:tabular-nums}
+  .row input[type=range]{width:100%;accent-color:var(--accent)}
+  canvas{width:100%;height:220px;background:var(--panel2);border-radius:8px;display:block}
+  .foot{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+  .warn{background:#2a1a0a;border:1px solid var(--warn);color:#ffd089;border-radius:8px;padding:10px 12px;font-size:12px;margin:0 16px}
+</style>
+</head>
+<body>
+<header>
+  <h1>🛹 Onewheel Tuner <span class="pill">via ST-Link</span></h1>
+  <span class="pill" id="conn">connexion…</span>
+  <span class="sp"></span>
+  <button class="kill" id="btnKill">⛔ KILL (désarmer)</button>
+</header>
+<div class="warn">⚠️ Roues en l'air pour régler. « Armer » met les moteurs sous tension. KILL coupe tout instantanément.</div>
+
+<div class="wrap">
+  <div>
+    <div class="card">
+      <h2>Télémétrie</h2>
+      <div style="text-align:center;margin-bottom:12px"><span class="badge" id="state">—</span></div>
+      <div class="telem">
+        <div class="stat"><div class="k">Assiette</div><div class="v"><span id="pitch">0.0</span>°</div></div>
+        <div class="stat"><div class="k">Commande</div><div class="v" id="out">0</div></div>
+        <div class="stat"><div class="k">Armé</div><div class="v" id="armed">—</div></div>
+        <div class="stat"><div class="k">Footpad</div><div class="v" id="footpad">—</div></div>
+        <div class="stat"><div class="k">I2C ok</div><div class="v" id="i2cok">0</div></div>
+        <div class="stat"><div class="k">I2C fail</div><div class="v" id="i2cfail">0</div></div>
+      </div>
+      <div class="foot">
+        <button id="btnArm">Armer</button>
+        <button id="btnFoot">Engager (footpad)</button>
+      </div>
+    </div>
+    <div class="card" style="margin-top:16px">
+      <h2>Courbes (assiette / commande)</h2>
+      <canvas id="chart" width="600" height="220"></canvas>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Réglages (écriture live en SWD)</h2>
+    <div id="params"></div>
+    <div class="foot">
+      <button id="btnRead">Relire la carte</button>
+      <button id="btnSave" class="on">💾 Sauver en flash</button>
+      <span id="saveMsg" class="pill"></span>
+    </div>
+    <p class="pill" style="margin-top:10px">Réglages écrits en RAM en direct. « Sauver en flash » les grave dans la carte (survit à l'extinction, rechargés au boot). ⚠️ Coupe les moteurs (pied levé) avant de sauver.</p>
+  </div>
+</div>
+
+<script>
+const FIELDS = [
+  {k:'kp',   label:'Kp (proportionnel)', min:0, max:20000, step:100, scale:100},
+  {k:'ki',   label:'Ki (intégral)',      min:0, max:2000, step:5,  scale:100},
+  {k:'kd',   label:'Kd (amort. gyro)',   min:0, max:6000, step:20, scale:100},
+  {k:'angle_expo', label:'Expo angle (progressivité)', min:0, max:500, step:5, scale:1000, unit:'/°'},
+  {k:'setpoint_trim', label:'Trim assiette', min:-50, max:50, step:1, scale:10, unit:'°'},
+  {k:'deadband',      label:'Zone morte',    min:0, max:20, step:1,  scale:10, unit:'°'},
+  {k:'output_max',    label:'Commande max',  min:100, max:1000, step:10, scale:1},
+  {k:'output_ramp',   label:'Rampe sortie (réactivité)', min:4, max:300, step:2, scale:1},
+  {k:'start_ramp',    label:'Démarrage progressif', min:0, max:2000, step:50, scale:1, unit:'ms'},
+  {k:'current_limit', label:'Limite courant',min:20, max:400, step:5, scale:10, unit:'A'},
+  {k:'fault_angle_max',label:'Angle coupure',min:100, max:600, step:5, scale:10, unit:'°'},
+];
+async function api(path, body){
+  const opt = body ? {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)} : {};
+  const r = await fetch(path, opt); return r.json();
+}
+function setVal(name, value){ api('/api/set', {name, value}); }
+
+// ---- sliders ----
+const root = document.getElementById('params');
+for(const f of FIELDS){
+  const row = document.createElement('div'); row.className='row';
+  row.innerHTML = `<label>${f.label} <b id="v_${f.k}">–</b></label>`;
+  const inp = document.createElement('input'); inp.type='range';
+  inp.min=f.min; inp.max=f.max; inp.step=f.step; inp.id='f_'+f.k;
+  let t=null;
+  inp.oninput = ()=>{ const raw=parseInt(inp.value);
+    document.getElementById('v_'+f.k).textContent = fmt(f, raw);
+    clearTimeout(t); t=setTimeout(()=>setVal(f.k, raw), 60); };
+  row.appendChild(inp); root.appendChild(row);
+}
+function fmt(f, raw){ const v = raw/f.scale; return (f.scale>1? v.toFixed(f.scale>=100?2:1): v) + (f.unit?' '+f.unit:''); }
+
+async function loadConfig(){
+  const c = await api('/api/config');
+  for(const f of FIELDS){ if(f.k in c){ const el=document.getElementById('f_'+f.k);
+    el.value=c[f.k]; document.getElementById('v_'+f.k).textContent=fmt(f,c[f.k]); } }
+}
+document.getElementById('btnRead').onclick = loadConfig;
+document.getElementById('btnSave').onclick = async ()=>{
+  const el = document.getElementById('saveMsg');
+  el.textContent = '⏳ écriture flash…'; el.style.color = '';
+  try{
+    const r = await api('/api/save', {});
+    el.textContent = (r.ok?'✅ ':'❌ ') + (r.msg||'');
+    el.style.color = r.ok ? 'var(--ok)' : 'var(--bad)';
+  }catch(e){ el.textContent = '❌ ' + e; el.style.color = 'var(--bad)'; }
+  setTimeout(()=>{ el.textContent=''; }, 6000);
+};
+
+// ---- boutons ----
+let armed=0, foot=0;
+document.getElementById('btnArm').onclick = ()=>{ armed=armed?0:1; setVal('armed',armed); };
+document.getElementById('btnFoot').onclick = ()=>{ foot=foot?0:1; setVal('footpad',foot); };
+document.getElementById('btnKill').onclick = ()=>{ armed=0; foot=0; setVal('armed',0); setVal('footpad',0); };
+
+// ---- telemetrie + chart ----
+const STATES={0:['IDLE','#555'],1:['ARMÉ','#39d3ff'],2:['RIDING','#3ddc84'],3:['TILTBACK','#c77dff'],4:['FAULT','#ff5470'],65535:['MANUEL','#ffb020']};
+const cv=document.getElementById('chart'), cx=cv.getContext('2d'); const hist=[]; const HN=220;
+function draw(){ const w=cv.width,h=cv.height; cx.clearRect(0,0,w,h);
+  cx.strokeStyle='#2b3542'; cx.beginPath(); cx.moveTo(0,h/2); cx.lineTo(w,h/2); cx.stroke();
+  const plot=(sel,color,sc)=>{ cx.strokeStyle=color; cx.lineWidth=1.5; cx.beginPath();
+    hist.forEach((d,i)=>{ const x=i/HN*w, y=h/2 - sel(d)*sc; i?cx.lineTo(x,y):cx.moveTo(x,y); }); cx.stroke(); };
+  plot(d=>d.p,'#39d3ff', h/2/30); plot(d=>d.o,'#3ddc84', h/2/500);
+  cx.fillStyle='#8b98a8'; cx.font='11px sans-serif'; cx.fillText('assiette (°)',8,14);
+  cx.fillStyle='#3ddc84'; cx.fillText('commande',92,14);
+}
+async function tick(){
+  try{
+    const t = await api('/api/telemetry');
+    document.getElementById('conn').textContent='connecté';
+    document.getElementById('pitch').textContent=t.pitch.toFixed(1);
+    document.getElementById('out').textContent=t.out;
+    document.getElementById('armed').textContent=t.armed?'●':'○';
+    document.getElementById('footpad').textContent=t.footpad?'●':'○';
+    document.getElementById('i2cok').textContent=t.i2c_ok;
+    document.getElementById('i2cfail').textContent=t.i2c_fail;
+    armed=t.armed; foot=t.footpad;
+    document.getElementById('btnArm').className = t.armed?'on':'';
+    document.getElementById('btnArm').textContent = t.armed?'Armé ✓':'Armer';
+    document.getElementById('btnFoot').className = t.footpad?'on':'';
+    const s=STATES[t.state]||[t.state_name,'#555']; const b=document.getElementById('state');
+    b.textContent=s[0]; b.style.background=s[1]; b.style.color='#04220f';
+    hist.push({p:t.pitch,o:t.out}); if(hist.length>HN)hist.shift(); draw();
+  }catch(e){ document.getElementById('conn').textContent='hors ligne'; }
+}
+loadConfig();
+setInterval(tick, 150);
+</script>
+</body>
+</html>

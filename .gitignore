@@ -1,0 +1,22 @@
+# === Toolchains & outils (volumineux, non versionnes) ===
+/arm/
+/ocd/
+/openocd-0.12.0/
+zadig.exe
+*.exe
+
+# === Artefacts de build ===
+build/
+foc/build/
+*.o
+*.elf
+*.map
+*.hex
+*.lst
+
+# === Logs / temporaires ===
+*.log
+tuner/bridge.log
+
+# === Scripts de mise au point jetables (journal de debug, non necessaires) ===
+# Le depot ne garde que le firmware (foc/), l'interface (tuner/) et reglage.bat.
