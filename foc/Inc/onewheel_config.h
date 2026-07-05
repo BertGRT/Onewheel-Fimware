@@ -139,13 +139,13 @@ typedef struct __attribute__((packed)) {
     .magic             = OW_CONFIG_MAGIC,       \
     .kp                = 13300, /* 133.0 : gain proportionnel (pente au centre) */ \
     .ki                = 0,     /* 0.0  */      \
-    .kd                = 40,    /* 0.4 : amortissement gyro */ \
+    .kd                = 300,   /* 3.0 : amortissement gyro */ \
     .setpoint_trim     = -13,   /* -1.3 deg : offset de montage MPU mesure */ \
     .start_angle_max   = 80,    /* 8.0 deg : fenetre d'engagement */ \
     .fault_angle_max   = 190,   /* 19.0 deg : coupure si depasse */  \
     .output_max        = 1000,  /* plein */    \
     .output_ramp       = 210,   /* rampe de conduite (frein reactif) */ \
-    .current_limit     = 200,   /* 20.0 A (courant phase, pilote i_max/curDC_max) */ \
+    .current_limit     = 220,   /* 22.0 A (courant phase, pilote i_max/curDC_max) */ \
     .tiltback_speed    = 0,     /* off */      \
     .tiltback_angle    = 60,    /* 6.0 deg */   \
     .lowbat_voltage    = 345,   /* 34.5V (10S ~3.45V/cell : alerte) */ \
