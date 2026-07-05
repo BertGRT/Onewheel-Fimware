@@ -2,8 +2,8 @@
 
 Conversion d'un **hoverboard** (carte « split » GD32F103 / STM32F103RC) en
 **onewheel auto‑équilibré**. Les deux moteurs sont recâblés pour tourner dans le
-même sens, une **MPU6050** sert d'IMU, et l'**inter optique** d'origine sert de
-sécurité repose‑pied. Tout se règle **en direct depuis un navigateur**, via le
+même sens, une **MPU6050** sert d'IMU, et un **contact mécanique** (repose‑pied) sur
+PB11 sert de sécurité d'engagement. Tout se règle **en direct depuis un navigateur**, via le
 **ST‑Link seul** (aucun UART/FTDI nécessaire), et les réglages se **sauvent en flash**.
 
 Le firmware s'appuie sur le
@@ -68,7 +68,7 @@ reglage.bat              lance l'interface (python tuner/bridge.py)
 | MPU6050 SDA | `PA2` | I2C logiciel (bit‑bang), WHO_AM_I=0x68 confirmé |
 | MPU6050 SCL | `PA3` | fils torsadés, éloignés de la puissance (EMI) |
 | MPU6050 VCC | 3V3 | pas 5 V |
-| Repose‑pied (optique) | `PB11` | actif bas (pull‑up interne), pastille data UARTR1 |
+| Repose‑pied (contact mécanique) | `PB11` | actif bas vers GND (pull‑up interne), pastille data UARTR1 |
 | Programmation / réglage | SWD | **ST‑Link V2** (`SWDIO`/`SWCLK`/`GND`) |
 
 Orientation MPU : à plat, puce vers le haut, axe **X = sens de marche**.

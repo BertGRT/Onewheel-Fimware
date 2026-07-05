@@ -44,19 +44,25 @@ gyro axe **Y**, `GYRO_PITCH_SIGN = -1`.
 
 ---
 
-## 3. Repose‑pied — inter optique (footpad)
+## 3. Repose‑pied — contact mécanique (footpad)
 
 Sécurité d'engagement : pas de pied → pas d'équilibrage.
 
-| Signal | Broche MCU | Niveau | Remarque |
-|---|---|---|---|
-| Footpad | **PB11** | **actif bas** | pastille data UARTR1 ; pull‑up interne ; switch vers **GND** |
+**Modification** : le capteur **optique d'origine est abandonné** (il passait par le µC
+de la sideboard, envoyé en série au GD32 — pas exploité ici). À la place, un **contact
+mécanique fabriqué** (« support de contact footpad ») est câblé **directement** :
 
-- Ouvert = **1** = pas de pied ; fermé = **0** = pied présent (`footpad_active_low = 1`).
-- ⚠️ La ligne UARTR1 comporte une **résistance CMS en série** sur la carte : souder
-  **côté puce** (en amont de la résistance) pour l'ignorer, sinon le signal n'arrive pas.
+| Signal | Broche MCU | Niveau | Câblage |
+|---|---|---|---|
+| Footpad | **PB11** | **actif bas** | contact entre **PB11** et **GND** ; pull‑up interne |
+
+- Ouvert = **1** = pas de pied ; fermé (pied présent) = **0** (`footpad_active_low = 1`).
+- Point de piquage = **pastille data UARTR1** (PB11). ⚠️ Cette ligne comporte une
+  **résistance CMS en série** sur la carte : souder **côté puce** (en amont de la
+  résistance) sinon le signal n'arrive pas — c'était la cause d'un faux contact au début.
+- Sideboard **débranchée** (le domaine série optique n'est plus utilisé).
 - Un **OU logiciel** (`ow_footpad`, via interface web) permet d'armer l'engagement
-  roues en l'air sans le capteur.
+  roues en l'air sans toucher le contact.
 
 ---
 
@@ -131,7 +137,7 @@ Conversion courant : `A2BIT_CONV = 50` (1 A ↔ 50 LSB). La limite de courant es
 |---|---|---|
 | **PA2** | MPU6050 **SDA** (I2C soft) | entrée commande optionnelle (libre) |
 | **PA3** | MPU6050 **SCL** (I2C soft) | entrée commande optionnelle (libre) |
-| **PB11** | Footpad optique (actif bas) | data UARTR1 |
+| **PB11** | Footpad **contact mécanique** (actif bas, vers GND) | data UARTR1 |
 
 Tout le reste (moteurs, Hall, ADC, LED, buzzer, SWD) = câblage **d'origine** de la carte.
 
@@ -141,6 +147,6 @@ Tout le reste (moteurs, Hall, ADC, LED, buzzer, SWD) = câblage **d'origine** de
 
 - **MPU en 3V3** et **GND bien soudée** (masse froide = pas d'ACK).
 - **Fils I2C torsadés + éloignés de la puissance** (sinon EMI moteur → lectures perdues).
-- **Footpad PB11** : souder **côté puce** (bypass résistance CMS série).
+- **Footpad PB11** (contact mécanique vers GND) : souder **côté puce** (bypass résistance CMS série).
 - **Masses distinctes** : logique (MPU/SWD) ≠ sideboard/UART.
 - **Premier essai TOUJOURS roues en l'air** — vérifier le sens de rattrapage avant de monter.
