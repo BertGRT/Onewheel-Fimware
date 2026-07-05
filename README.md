@@ -73,6 +73,8 @@ reglage.bat              lance l'interface (python tuner/bridge.py)
 
 Orientation MPU : à plat, puce vers le haut, axe **X = sens de marche**.
 
+> Câblage complet (moteurs, Hall, ADC, alimentation, masses) : **[CONNEXIONS.md](CONNEXIONS.md)**.
+
 ---
 
 ## Compilation
